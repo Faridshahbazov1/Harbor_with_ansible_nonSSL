@@ -1,0 +1,45 @@
+---
+ - name: Uninstall Harbor
+   hosts: harbor_servers
+   become: yes
+
+#===== DOCKER ENGINE =====#
+
+   tasks:
+
+      - name: Docker compose-down
+        shell: cd /etc/harbor; docker-compose down
+        ignore_errors: True
+
+
+      - name: Stop service docker
+        service: name=docker state=stopped
+        ignore_errors: True
+
+      - name: Remove yum-utils
+        yum: name=yum-utils state=absent
+        ignore_errors: True
+
+      - name: Remove docker-ce
+        yum: name=docker-ce  state=absent
+      
+      - name: Remove docker-ce-cli
+        yum: name=docker-ce-cli state=absent
+
+      - name: Remove conainerd.io
+        yum: name=containerd.io state=absent
+
+      - name: Remove docker-compose-plugin
+        yum: name=docker-compose-plugin state=absent
+
+      - name: Remove curl
+        yum: name=curl state=absent
+        ignore_errors: True
+       
+      
+      - name: Delete docker compose dir and symbolic links
+        shell: cd /usr/local/lib; rm -rf cli-plugins; cd /etc/; rm -rf harbor; cd /root/; rm -rf .docker; cd /usr/local/bin; rm -rf docker-compose; cd /usr/bin/; rm -rf docker-compose
+        ignore_errors: True
+
+   
+

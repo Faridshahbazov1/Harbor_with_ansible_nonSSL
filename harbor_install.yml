@@ -1,0 +1,107 @@
+---
+ - name: Install Harbor
+   hosts: harbor_servers
+   become: yes
+ 
+#===== DOCKER ENGINE =====#
+   tasks:
+   - name: Add Repository Docker Engine
+     shell: dnf config-manager  --add-repo  https://download.docker.com/linux/centos/docker-ce.repo
+
+   - name: Install Docker Utils
+     ansible.builtin.yum: 
+       name:
+         - yum-utils
+         - docker-ce
+         - docker-ce-cli
+         - containerd.io
+         - docker-compose-plugin
+         - curl
+       state: latest 
+
+
+#=====  DOCKER ENGINE =====#
+
+#===== DOCKER COMPOSE =====#
+    
+ 
+   - name: Start and Enable Docker Service
+     service: name=docker.service  state=started  enabled=yes
+     ignore_errors: True
+
+   - name: Copy Docker-compose to home
+     shell: DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}; mkdir -p $DOCKER_CONFIG/cli-plugins; curl -SL https://github.com/docker/compose/releases/download/v2.4.1/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose; chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose; cp -r /root/.docker/cli-plugins /usr/local/lib; chmod +x /usr/local/lib/cli-plugins/docker-compose; cp /root/.docker/cli-plugins/docker-compose /usr/local/bin/;  ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+
+#===== DOCKER COMPOSE =====#
+
+#===== INSTALL HARBOR =====#
+
+   - name: Extract harbor-online-installer-v2.5.2.tgz into /home/ansible
+     ansible.builtin.unarchive:
+      src: /home/ansible/harbor_with_ansible/harbor-online-installer-v2.5.2.tgz 
+      dest: /etc
+
+   - name: Rename name to  harbor.yml
+     shell: cd /etc/harbor; mv harbor.yml.tmpl harbor.yml
+
+   - name: Edit harbor_yml file
+     replace:
+      path: /etc/harbor/harbor.yml
+      regexp: 'hostname: reg.mydomain.com'
+      replace:  'hostname: {{ ansible_nodename }}'
+   
+#=====    WITHOUT SSL BEGIN  =====#
+
+   - name: Comment lines
+     replace:
+       path: /etc/harbor/harbor.yml
+       regexp: 'https'
+       replace: '#https'
+
+   - name: Comment port lines
+     replace:
+      path: /etc/harbor/harbor.yml
+      regexp: 'port: 443'
+      replace: '#port: 443'
+
+   - name: Comment cert lines
+     replace:
+      path: /etc/harbor/harbor.yml
+      regexp: 'certificate:'
+      replace: '#certificate:'
+
+   - name: Comment key lines
+     replace:
+      path: /etc/harbor/harbor.yml
+      regexp: 'private_key'
+      replace: '#private_key'
+        
+       
+   - name: Run Install.sh 
+     shell: cd /etc/harbor; ./install.sh
+
+   - name: Start and Enable Docker Service
+     service: name=docker.service state=started enabled=yes
+
+   - name: Run docker-compose
+     shell: cd /etc/harbor; docker-compose up -d
+#     notify: restart
+
+
+#===== WITHOUT SSL END =====#
+
+#===== RELOAD DOCKER-COMPOSE BEGIN  =====#
+
+   - name: Check Docker Compose(1)
+     shell: cd /etc/harbor; docker-compose down
+
+   - name: Check Docker Compose(2)
+     shell: cd /etc/harbor; docker-compose up -d
+
+#===== RELOAD DOCKER-COMPOSE BEGIN  =====#
+
+#   handlers:
+#   - name: restart
+#     service: name=docker.service state=restarted
+
+
